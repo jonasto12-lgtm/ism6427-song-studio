@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Song Studio</title>
+<meta name="description" content="Turn an idea into a full song with AI, powered by the Suno API.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%B5%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f6f5f2; --surface: #ffffff; --surface-2: #efede8; --text: #1c1b19; --muted: #6b6862;
+    --border: #e2dfd8; --accent: #5b4bdb; --accent-text: #ffffff; --accent-soft: #ecebfd;
+    --danger: #b3261e; --danger-soft: #fdecea; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121214; --surface: #1b1b1f; --surface-2: #26262c; --text: #ededf0; --muted: #a09fa8;
+      --border: #2f2f36; --accent: #8f83ff; --accent-text: #0f0d24; --accent-soft: #24213f;
+      --danger: #ff8a80; --danger-soft: #3a1f1d; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121214; --surface: #1b1b1f; --surface-2: #26262c; --text: #ededf0; --muted: #a09fa8;
+    --border: #2f2f36; --accent: #8f83ff; --accent-text: #0f0d24; --accent-soft: #24213f;
+    --danger: #ff8a80; --danger-soft: #3a1f1d; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+  h1 { font-size: 1.6rem; margin: 0; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 4px 0 0; }
+  .credits { font-size: .85rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border);
+    padding: 6px 10px; border-radius: 999px; white-space: nowrap; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+  .tabs { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; margin-bottom: 16px; }
+  .tabs button { border: 0; background: transparent; color: var(--muted); padding: 7px 14px; border-radius: 8px; font: inherit; font-size: .9rem; cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  label { display: block; font-weight: 600; font-size: .9rem; margin: 14px 0 6px; }
+  label:first-child { margin-top: 0; }
+  .hint { font-weight: 400; color: var(--muted); }
+  textarea, input[type=text] { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px; font: inherit; resize: vertical; }
+  textarea:focus, input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { border: 1px solid var(--border); background: transparent; color: var(--muted); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: .8rem; cursor: pointer; }
+  .chip:hover { color: var(--text); border-color: var(--muted); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: .9rem; cursor: pointer; margin: 0; font-weight: 500; }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 10px; padding: 11px 20px; font: inherit; font-weight: 600; cursor: pointer; }
+  .primary:disabled { opacity: .55; cursor: progress; }
+  .hidden { display: none !important; }
+  .msg { margin-top: 16px; padding: 12px 14px; border-radius: 10px; font-size: .92rem; }
+  .msg.err { background: var(--danger-soft); color: var(--danger); }
+  .msg.info { background: var(--accent-soft); color: var(--text); display: flex; align-items: center; gap: 10px; }
+  .spin { width: 16px; height: 16px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: s 0.8s linear infinite; flex: none; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  h2 { font-size: 1.1rem; margin: 32px 0 12px; }
+  .tracks { display: grid; gap: 14px; }
+  .track { display: grid; grid-template-columns: 96px 1fr; gap: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+  .track img, .track .ph { width: 96px; height: 96px; border-radius: 10px; object-fit: cover; background: var(--surface-2); }
+  .track h3 { margin: 0; font-size: 1rem; }
+  .track .tags { color: var(--muted); font-size: .8rem; margin: 2px 0 8px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .track audio { width: 100%; height: 36px; }
+  .track .links { display: flex; gap: 14px; margin-top: 6px; font-size: .85rem; }
+  .track a, .track summary { color: var(--accent); cursor: pointer; text-decoration: none; }
+  .track pre { white-space: pre-wrap; font: inherit; font-size: .85rem; color: var(--muted); margin: 8px 0 0; max-height: 240px; overflow: auto; }
+  .empty { color: var(--muted); font-size: .92rem; }
+  footer { margin-top: 40px; color: var(--muted); font-size: .8rem; text-align: center; }
+  .theme { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 10px; font: inherit; font-size: .85rem; cursor: pointer; }
+  @media (max-width: 520px) {
+    .track { grid-template-columns: 64px 1fr; }
+    .track img, .track .ph { width: 64px; height: 64px; }
+    header { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>🎵 Song Studio</h1>
+      <p class="sub">Describe a song and AI writes, sings and produces it in about a minute.</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="credits" id="credits">Credits: …</span>
+      <button class="theme" id="theme" type="button" title="Switch theme">◐ Auto</button>
+    </div>
+  </header>
+
+  <form class="card" id="form" autocomplete="off">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" aria-selected="true" data-mode="simple">Simple</button>
+      <button type="button" role="tab" aria-selected="false" data-mode="custom">Custom lyrics</button>
+    </div>
+
+    <div id="simple">
+      <label for="prompt">Song idea <span class="hint">(no artist names)</span></label>
+      <textarea id="prompt" rows="3" maxlength="500" placeholder="A country and R&B fusion song about the Florida Atlantic University Owls"></textarea>
+      <div class="chips" id="ideas">
+        <button type="button" class="chip">Lo-fi beat for late-night studying</button>
+        <button type="button" class="chip">Upbeat pop song about graduation day</button>
+        <button type="button" class="chip">Epic orchestral theme for a startup pitch</button>
+        <button type="button" class="chip">Reggae song about Florida summer rain</button>
+      </div>
+    </div>
+
+    <div id="custom" class="hidden">
+      <label for="title">Title <span class="hint">(optional)</span></label>
+      <input type="text" id="title" maxlength="80" placeholder="Midnight on Glades Road">
+      <label for="style">Style</label>
+      <input type="text" id="style" maxlength="1000" placeholder="Indie rock, female vocals, dreamy, 90 BPM">
+      <label for="lyrics" id="lyricsLabel">Lyrics</label>
+      <textarea id="lyrics" rows="7" maxlength="5000" placeholder="[Verse]&#10;Write your own lines here…&#10;&#10;[Chorus]&#10;…"></textarea>
+    </div>
+
+    <div class="row">
+      <label class="toggle"><input type="checkbox" id="instrumental"> Instrumental (no vocals)</label>
+      <button class="primary" id="go" type="submit">Create song</button>
+    </div>
+    <div id="status" class="msg info hidden"><span class="spin"></span><span id="statusText"></span></div>
+    <div id="error" class="msg err hidden" role="alert"></div>
+  </form>
+
+  <h2>Your songs</h2>
+  <div class="tracks" id="tracks"><p class="empty" id="empty">Songs you create show up here. Each idea makes two versions.</p></div>
+
+  <footer>Built with the Suno API (sunoapi.org) and Netlify Functions · ISM 6427</footer>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  let mode = "simple";
+
+  // Theme: auto → light → dark
+  const themes = ["auto", "light", "dark"];
+  const labels = { auto: "◐ Auto", light: "☀ Light", dark: "☾ Dark" };
+  let theme = "auto";
+  try { theme = localStorage.getItem("theme") || "auto"; } catch {}
+  const applyTheme = () => {
+    if (theme === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", theme);
+    $("theme").textContent = labels[theme];
+  };
+  applyTheme();
+  $("theme").onclick = () => {
+    theme = themes[(themes.indexOf(theme) + 1) % themes.length];
+    try { localStorage.setItem("theme", theme); } catch {}
+    applyTheme();
+  };
+
+  // Mode tabs
+  document.querySelectorAll(".tabs button").forEach((b) => {
+    b.onclick = () => {
+      mode = b.dataset.mode;
+      document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", x === b));
+      $("simple").classList.toggle("hidden", mode !== "simple");
+      $("custom").classList.toggle("hidden", mode !== "custom");
+    };
+  });
+  $("instrumental").onchange = () => {
+    const on = $("instrumental").checked;
+    $("lyrics").disabled = on;
+    $("lyricsLabel").textContent = on ? "Lyrics (not used for instrumentals)" : "Lyrics";
+  };
+  document.querySelectorAll("#ideas .chip").forEach((c) => (c.onclick = () => { $("prompt").value = c.textContent; $("prompt").focus(); }));
+
+  const loadCredits = async () => {
+    try {
+      const r = await fetch("/api/credits").then((r) => r.json());
+      $("credits").textContent = r.credits != null ? `Credits: ${Math.floor(r.credits).toLocaleString()}` : "Credits: n/a";
+    } catch { $("credits").textContent = "Credits: n/a"; }
+  };
+  loadCredits();
+
+  const showError = (m) => { $("error").textContent = m; $("error").classList.toggle("hidden", !m); };
+  const showStatus = (m) => { $("statusText").textContent = m || ""; $("status").classList.toggle("hidden", !m); };
+  const fmt = (s) => (s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : "");
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  const renderTrack = (t, el) => {
+    el = el || document.createElement("div");
+    el.className = "track";
+    el.dataset.id = t.id;
+    const src = t.audio || t.stream;
+    el.innerHTML = `
+      ${t.image ? `<img src="${esc(t.image)}" alt="Cover art for ${esc(t.title)}">` : `<div class="ph"></div>`}
+      <div>
+        <h3>${esc(t.title || "Untitled")} <span class="hint" style="font-size:.8rem">${fmt(t.duration)}</span></h3>
+        <div class="tags">${esc(t.tags)}</div>
+        ${src ? `<audio controls preload="none" src="${esc(src)}"></audio>` : `<div class="hint" style="font-size:.85rem">Rendering audio…</div>`}
+        <div class="links">
+          ${t.audio ? `<a href="${esc(t.audio)}" target="_blank" rel="noopener" download>Download MP3</a>` : ""}
+        </div>
+        ${t.lyrics ? `<details><summary>Lyrics</summary><pre>${esc(t.lyrics)}</pre></details>` : ""}
+      </div>`;
+    return el;
+  };
+
+  const upsertTracks = (tracks) => {
+    $("empty")?.remove();
+    for (const t of tracks) {
+      const existing = document.querySelector(`.track[data-id="${CSS.escape(t.id)}"]`);
+      if (existing) {
+        const playing = existing.querySelector("audio") && !existing.querySelector("audio").paused;
+        if (!playing && (t.audio && !existing.innerHTML.includes(t.audio))) renderTrack(t, existing);
+      } else {
+        $("tracks").prepend(renderTrack(t));
+      }
+    }
+  };
+
+  const STATUS_TEXT = {
+    PENDING: "Queued — warming up the studio…",
+    TEXT_SUCCESS: "Lyrics written — now producing the music…",
+    FIRST_SUCCESS: "First version ready — finishing the second…",
+  };
+
+  const poll = async (taskId) => {
+    const started = Date.now();
+    while (Date.now() - started < 6 * 60 * 1000) {
+      await new Promise((r) => setTimeout(r, 5000));
+      let r;
+      try { r = await fetch(`/api/status?taskId=${encodeURIComponent(taskId)}`).then((x) => x.json()); }
+      catch { continue; }
+      if (r.error) throw new Error(r.error);
+      if (r.tracks?.length) upsertTracks(r.tracks.filter((t) => t.audio || t.stream));
+      if (r.done) return;
+      showStatus(STATUS_TEXT[r.status] || "Working on it…");
+    }
+    throw new Error("This is taking longer than usual. Check back in a minute or try again.");
+  };
+
+  $("form").onsubmit = async (e) => {
+    e.preventDefault();
+    showError("");
+    const payload = { mode, instrumental: $("instrumental").checked };
+    if (mode === "simple") payload.prompt = $("prompt").value;
+    else Object.assign(payload, { title: $("title").value, style: $("style").value, lyrics: $("lyrics").value });
+
+    $("go").disabled = true;
+    showStatus("Sending your idea to Suno…");
+    try {
+      const res = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const r = await res.json();
+      if (!res.ok || r.error) throw new Error(r.error || "Could not start the song.");
+      showStatus(STATUS_TEXT.PENDING);
+      await poll(r.taskId);
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      showStatus("");
+      $("go").disabled = false;
+      loadCredits();
+    }
+  };
+})();
+</script>
+</body>
+</html>
